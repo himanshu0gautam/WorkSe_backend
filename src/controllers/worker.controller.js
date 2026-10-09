@@ -5,11 +5,34 @@ import sessionModel from "../models/workerSession.model.js";
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
 import config from "../config/config.js";
+import { uploadToImagekit } from "../services/cloudStorage.js";
 
 export async function createUser(req, res) {
-  const { username, mobileNo } = req.body;
+  const { 
+    fullname,
+    mobileNo,
+    whattappNo,
+    experience,
+    age,
+    dob,
+    tradeCategory,
+    jobTitle,
+    jobDetails,
+    address,
+    state,
+    city,
+    pincode,
+    serviceRadius,
+    skill,
+    bio,
+    } = req.body;
 
-  if (username) {
+  if (!fullname || !mobileNo || !experience || !tradeCategory || !address || !state || !city || !skill) {
+    return res.json(new ApiResponse(400, "fullname"))
+  }
+
+  if (!req.file) {
+    return res.json(new ApiResponse(400, "please upload profile image"));
   }
 
   const isAllready = await workerModel.findOne({
@@ -17,12 +40,29 @@ export async function createUser(req, res) {
   });
 
   if (isAllready) {
-    res.json(new ApiResponse(409, "this user mobile number is already exist"));
+    return res.json(new ApiResponse(409, "this user mobile number is already exist"));
   }
 
+  const uploadResult = await uploadToImagekit(req.file, "/profile-picture");
+
   const user = await workerModel.create({
-    username,
+    fullname,
     mobileNo,
+    whattappNo,
+    experience,
+    age,
+    dob,
+    tradeCategory,
+    jobTitle,
+    jobDetails,
+    address,
+    state,
+    city,
+    pincode,
+    serviceRadius,
+    skill,
+    bio,
+    imageUrl: uploadResult.url,
   });
 
   const refreshToken = jwt.sign(
@@ -65,7 +105,7 @@ export async function createUser(req, res) {
   });
 
   const userData = {
-    user: user.username,
+    user: user.fullname,
     mobileNo: user.mobileNo,
     token: accessToken,
   };
@@ -74,12 +114,12 @@ export async function createUser(req, res) {
 }
 
 export async function userLogin(req, res) {
-  const { username, mobileNo } = req.body;
+  const { fullname, mobileNo } = req.body;
 
   const user = await workerModel.findOne({ mobileNo });
 
   if (!user) {
-    return res.json(new ApiResponse(401, "invalid username and mobile number"));
+    return res.json(new ApiResponse(401, "invalid fullname and mobile number"));
   }
 
   const hashedPassword = crypto
@@ -134,7 +174,7 @@ export async function userLogin(req, res) {
   })
 
   const userDetails = {
-    username: user.username,
+    username: user.fullname,
     mobileNo: user.mobileNo,
     accessToken
   }
@@ -154,7 +194,7 @@ export async function getMe(req, res) {
   const user = await workerModel.findById(decoded.id);
 
   const userDetails = {
-    username: user.username,
+    username: user.fullname,
     mobileNo: user.mobileNo,
   };
 

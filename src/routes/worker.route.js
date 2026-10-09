@@ -1,10 +1,12 @@
 import { Router } from "express"
 import * as workerController from "../controllers/worker.controller.js"
+import { uploadSingleImage } from "../middlewares/multer.middleware.js"
+
 const workerRouter = Router()
 
 
 // POST - /api/v1/worker/register
-workerRouter.post("/register", workerController.createUser)
+workerRouter.post("/register",uploadSingleImage, workerController.createUser)
 
 // POST - /api/v1/worker/login
 workerRouter.post("/login", workerController.userLogin)

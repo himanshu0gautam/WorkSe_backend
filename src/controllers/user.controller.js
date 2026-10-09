@@ -29,7 +29,7 @@ const generateToken = (user) => {
 // send otp
 export async function sendOTP(req, res) {
   try {
-    const { phone } = req.body;
+    const { phone, username } = req.body;
 
     if (!phone) {
       return res.json(new ApiResponse(400, "Phone number is required"));
@@ -44,7 +44,7 @@ export async function sendOTP(req, res) {
     await OTP.deleteMany({ phone });
 
     // store hash otp
-    await OTP.create({ phone, otpHash });
+    await OTP.create({ phone, otpHash, username });
 
     await sendSMS(phone, rawOtp);
 
@@ -60,7 +60,7 @@ export async function sendOTP(req, res) {
 // verify otp
 export async function verifyOTP(req, res) {
   try {
-    const { phone, otp } = req.body;
+    const { phone, otp, username } = req.body;
 
     if (!phone || !otp) {
       return res.json(new ApiResponse(400, "Phone and OTP are required"));
@@ -86,7 +86,8 @@ export async function verifyOTP(req, res) {
     if(!user){
         user = await User.create({
             phone,
-            role: "user"
+            role: "user",
+            username
         })
     }
 
