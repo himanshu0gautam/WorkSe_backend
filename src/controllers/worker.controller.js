@@ -4,13 +4,32 @@ import workerModel from "../models/worker.model.js";
 import sessionModel from "../models/workerSession.model.js";
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
+import argon2 from "argon2";
 import config from "../config/config.js";
 import { uploadToImagekit } from "../services/cloudStorage.js";
+import OTP from "../models/otp.model.js";
+import { sendSMS } from "../services/smsProvider.js";
 
-export async function createUser(req, res) {
-  const { 
+const generate4DigitOTP = () => crypto.randomInt(1000, 9999).toString();
+
+const generateToken = (worker) => {
+  const accessToken = jwt.sign(
+    { id: worker._id, phone: worker.phone },
+    config.JWT_SECRET,
+    { expiresIn: "15m" },
+  );
+
+  const refreshToken = jwt.sign({ id: worker._id }, config.JWT_SECRET, {
+    expiresIn: "30d",
+  });
+
+  return { accessToken, refreshToken };
+};
+
+export async function createWorker(req, res) {
+  const {
     fullname,
-    mobileNo,
+    phone,
     whattappNo,
     experience,
     age,
@@ -25,29 +44,47 @@ export async function createUser(req, res) {
     serviceRadius,
     skill,
     bio,
-    } = req.body;
+  } = req.body;
 
-  if (!fullname || !mobileNo || !experience || !tradeCategory || !address || !state || !city || !skill) {
-    return res.json(new ApiResponse(400, "fullname"))
+  if (
+    !fullname ||
+    !phone ||
+    !experience ||
+    !tradeCategory ||
+    !address ||
+    !state ||
+    !city ||
+    !skill
+  ) {
+    return res.json(new ApiResponse(400, "fullname"));
   }
 
   if (!req.file) {
-    return res.json(new ApiResponse(400, "please upload profile image"));
+    return res
+      .status(400)
+      .json(
+        new ApiResponse(
+          400,
+          "Please upload a profile image using the 'image' field",
+        ),
+      );
   }
 
   const isAllready = await workerModel.findOne({
-    $or: [{ mobileNo }],
+    $or: [{ phone }],
   });
 
   if (isAllready) {
-    return res.json(new ApiResponse(409, "this user mobile number is already exist"));
+    return res.json(
+      new ApiResponse(409, "this user phone number is already exist"),
+    );
   }
 
-  const uploadResult = await uploadToImagekit(req.file, "/profile-picture");
+  const uploadResult = await uploadToImagekit(req.file, "profile-picture");
 
   const user = await workerModel.create({
     fullname,
-    mobileNo,
+    phone,
     whattappNo,
     experience,
     age,
@@ -79,6 +116,7 @@ export async function createUser(req, res) {
     .createHash("sha256")
     .update(refreshToken)
     .digest("hex");
+
   const session = await sessionModel.create({
     user: user._id,
     refreshTokenHash,
@@ -106,84 +144,169 @@ export async function createUser(req, res) {
 
   const userData = {
     user: user.fullname,
-    mobileNo: user.mobileNo,
+    phoneNo: user.phone,
     token: accessToken,
   };
 
   res.json(new ApiResponse(201, userData, "user register successfully"));
 }
 
-export async function userLogin(req, res) {
-  const { fullname, mobileNo } = req.body;
+export async function WorkerLogin(req, res) {
+  const { fullname, phone } = req.body;
 
-  const user = await workerModel.findOne({ mobileNo });
-
-  if (!user) {
-    return res.json(new ApiResponse(401, "invalid fullname and mobile number"));
+  if (!phone) {
+    return res.json(new ApiResponse(400, "phone number is required"));
   }
 
-  const hashedPassword = crypto
-    .createHash("sha256")
-    .update(password)
-    .digest("hex");
+  const worker = await workerModel.findOne({ phone });
 
-  const isPasswordValid = hashedPassword === user.password;
-
-  if (isPasswordValid) {
-    return res.json(new ApiResponse(401, "invalid mobile number"));
+  if (!worker) {
+    return res.json(new ApiResponse(401, "invalid fullname and phone number"));
   }
 
-  const refreshToken = jwt.sign(
-    {
-      id: user._id,
-    },
-    config.JWT_SECRET,
-    {
-      expiresIn: "15d",
-    },
+  const rawotp = generate4DigitOTP();
+  console.log(rawotp);
+
+  const otpHash = await argon2.hash(rawotp);
+
+  await OTP.deleteMany({ phone });
+
+  await OTP.create({ phone, fullname, otpHash });
+
+  await sendSMS(phone, rawotp);
+
+  // const hashedPassword = crypto
+  //   .createHash("sha256")
+  //   .update(password)
+  //   .digest("hex");
+
+  // const isPasswordValid = hashedPassword === user.password;
+
+  // if (isPasswordValid) {
+  //   return res.json(new ApiResponse(401, "invalid mobile number"));
+  // }
+
+  // const refreshToken = jwt.sign(
+  //   {
+  //     id: user._id,
+  //   },
+  //   config.JWT_SECRET,
+  //   {
+  //     expiresIn: "15d",
+  //   },
+  // );
+
+  // const refreshTokenHash = crypto
+  //   .createHash("sha256")
+  //   .update(refreshToken)
+  //   .digest("hex");
+
+  // const session = await sessionModel.create({
+  //   user: user._id,
+  //   refreshTokenHash,
+  //   ip: req.ip,
+  //   userAgent: req.headers["user-agent"],
+  // });
+
+  // const accessToken = jwt.sign(
+  //   {
+  //     id: user._id,
+  //     sessionId: session._id,
+  //   },
+  //   config.JWT_SECRET,
+  //   {
+  //     expiresIn: "15m",
+  //   },
+  // );
+
+  // res.cookies("refreshToken", refreshToken, {
+  //   httpOnly: true,
+  //   secure: true,
+  //   sameSite: "strict",
+  //   maxAge: 15 * 24 * 60 * 60 * 1000,
+  // });
+
+  // const userDetails = {
+  //   username: user.fullname,
+  //   mobileNo: user.mobileNo,
+  //   accessToken,
+  // };
+
+  return res.json(
+    new ApiResponse(200, "OTP sent successfully. Valid for 5 minutes."),
   );
+}
 
-  const refreshTokenHash = crypto
-    .createHash("sha256")
-    .update(refreshToken)
-    .digest("hex");
+export async function verifyOTPWorker(req, res) {
+  try {
+    const { phone, otp } = req.body;
 
-  const session = await sessionModel.create({
-    user: user._id,
-    refreshTokenHash,
-    ip: req.ip,
-    userAgent: req.headers["user-agent"],
-  });
+    if (!phone || !otp) {
+      return res.json(new ApiResponse(400, "Phone and OTP are required"));
+    }
 
-  const accessToken = jwt.sign(
-    {
-      id: user._id,
-      sessionId: session._id,
-    },
-    config.JWT_SECRET,
-    {
-      expiresIn: "15m",
-    },
-  );
+    const otpRecord = await OTP.findOne({ phone });
+    if (!otpRecord) {
+      return res.json(new ApiResponse(400, "OTP expired or not requested"));
+    }
 
-  res.cookies("refreshToken", refreshToken, {
-    httpOnly: true,
-    secure: true,
-    sameSite: "strict",
-    maxAge: 15 * 24 * 60 * 60 * 1000
-  })
+    const isValidotp = await argon2.verify(otpRecord.otpHash, otp);
+    if (!isValidotp) {
+      return res.json(new ApiResponse(400, "Invalid OTP"));
+    }
 
-  const userDetails = {
-    username: user.fullname,
-    mobileNo: user.mobileNo,
-    accessToken
+    const worker = await workerModel.findOne({ phone });
+    if (!worker) {
+      return res.json(new ApiResponse(404, "Worker not found"));
+    }
+
+    await OTP.deleteOne({ _id: otpRecord._id });
+
+    worker.isVerfify = true;
+    await worker.save();
+
+    const { accessToken, refreshToken } = generateToken(worker);
+
+    const refreshTokenHash = crypto
+      .createHash("sha256")
+      .update(refreshToken)
+      .digest("hex");
+
+    const session = await sessionModel.create({
+      user: worker._id,
+      refreshTokenHash,
+      ip: req.ip,
+      userAgent: req.headers["user-agent"],
+    });
+
+    res.cookie("refreshToken", refreshToken, {
+      httpOnly: true,
+      secure: true,
+      sameSite: "strict",
+      maxAge: 30 * 24 * 60 * 60 * 1000,
+    });
+
+    const workerDetails = {
+      id: worker._id,
+      fullname: worker.fullname,
+      category: worker.tradeCategory,
+      state: worker.state,
+      pincode: worker.pincode,
+      phone: worker.phone,
+      role: "worker",
+      accessToken,
+    };
+
+        return res.json(new ApiResponse(200, workerDetails, "Worker Login successful"))
+
+  } catch (error) {
+        console.error("verifyOTP error:", error)
+        return res.json(new ApiResponse(500, "OTP verfiy error"))
   }
-
-  res.json(new ApiResponse(200, userDetails, "User logged In successfully"))
 }
 
 export async function getMe(req, res) {
-  const token = req.headers.authorization?.split(" "[1]);
+  const token = req.headers.authorization?.split(" ")[1];
 
   if (!token) {
     return res.json(new ApiResponse(401, "user token not found"));
@@ -195,7 +318,7 @@ export async function getMe(req, res) {
 
   const userDetails = {
     username: user.fullname,
-    mobileNo: user.mobileNo,
+    phoneNo: user.phone,
   };
 
   res.json(new ApiResponse(200, userDetails, "user fetched successfully"));
@@ -266,7 +389,7 @@ export async function refreshToken(req, res) {
   );
 }
 
-export async function Userlogout(req, res) {
+export async function workerlogout(req, res) {
   const refreshToken = req.cookies.refreshToken;
 
   if (!refreshToken) {

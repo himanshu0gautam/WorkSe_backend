@@ -4,6 +4,7 @@ import helmet from 'helmet'
 import morgan from "morgan";
 import workerRouter from "./routes/worker.route.js";
 import userRouter from "./routes/user.router.js";
+import jobRouter from "./routes/job.router.js";
 
 const app = express()
 
@@ -35,5 +36,6 @@ app.get("/health", (req, res) => {
 
 app.use("/api/v1/worker", workerRouter)
 app.use("/api/v1/user", userRouter)
+app.use("/api/v1/user/job", jobRouter)
 
 export default app;

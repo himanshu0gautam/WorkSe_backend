@@ -14,10 +14,10 @@ userRouter.post("/send-otp", rateLimiter.otpRequestLimiter, validateRequest(send
 userRouter.post("/verify-otp", rateLimiter.otpVerifyLimiter, validateRequest(verifyOtpSchema), userController.verifyOTP)
 
 // POST - /api/v1/user/refresh-token
-userRouter.post("refresh-token", rateLimiter.refreshTokenLimiter, userController.refreshAccessToken)
+userRouter.post("/refresh-token", rateLimiter.refreshTokenLimiter, userController.refreshAccessToken)
 
 // POST - /api/v1/user/logout
-userRouter.post("logout", userController.logout)
+userRouter.post("/logout", userController.logout)
 
 // GET - /api/v1/user/profile
 userRouter.get("/profile", authenticateToken, (req, res) => {

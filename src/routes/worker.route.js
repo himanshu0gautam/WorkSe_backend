@@ -6,22 +6,25 @@ const workerRouter = Router()
 
 
 // POST - /api/v1/worker/register
-workerRouter.post("/register",uploadSingleImage, workerController.createUser)
+workerRouter.post("/register", uploadSingleImage, workerController.createWorker)
 
 // POST - /api/v1/worker/login
-workerRouter.post("/login", workerController.userLogin)
+workerRouter.post("/login", workerController.WorkerLogin)
+
+// POST - /api/v1/worker/verfiy-otp
+workerRouter.post("/verfiy-otp", workerController.verifyOTPWorker)
 
 // GET - /api/v1/worker/get-me
 workerRouter.get("/get-me", workerController.getMe)
 
-// GET - /api/v1/worker/refresh-token
-workerRouter.get("/refresh-token", workerController.refreshToken)
+// POST - /api/v1/worker/refresh-token
+workerRouter.post("/refresh-token", workerController.refreshToken)
 
-// GET - /api/v1/worker/logout
-workerRouter.get("/logout", workerController.Userlogout)
+// POST - /api/v1/worker/logout
+workerRouter.post("/logout", workerController.workerlogout)
 
-// GET - /api/v1/worker/logout-all
-workerRouter.get("/logout-all", workerController.logoutAll)
+// POST - /api/v1/worker/logout-all
+workerRouter.post("/logout-all", workerController.logoutAll)
 
 
 export default workerRouter

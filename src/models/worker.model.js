@@ -10,10 +10,10 @@ const workerSchema = new mongoose.Schema(
     whattappNo: {
       type: Number,
     },
-    mobileNo: {
+    phone: {
       type: Number,
-      required: [true, "mobile is required"],
-      unique: [true, "mobil number must be unique"],
+      required: [true, "phone is required"],
+      unique: [true, "phone number must be unique"],
     },
     experience: {
       type: Number,
@@ -65,6 +65,10 @@ const workerSchema = new mongoose.Schema(
       type: String,
       default: ''
     },
+    isVerfify: {
+      type: Boolean,
+      default: false
+    }
   },
   { timestamps: true },
 );

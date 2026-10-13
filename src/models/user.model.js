@@ -10,7 +10,7 @@ const userSchema = new mongoose.Schema(
     },
     username: {
       type: String,
-      required: [true, "username is required"]
+      // required: [true, "username is required"]
     },
     role: {
       type: String,

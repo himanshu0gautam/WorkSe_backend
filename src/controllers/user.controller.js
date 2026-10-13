@@ -119,7 +119,7 @@ export async function verifyOTP(req, res) {
 
   } catch (error) {
     console.error("verifyOTP error:", error)
-    return res.json(new ApiError(500, "authentication failed"))
+    return res.json(new ApiResponse(500, "OTP verfiy error"))
   }
 }
 

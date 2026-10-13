@@ -23,7 +23,7 @@ export const otpRequestLimiter = rateLimit({
 // ----------------------------------------------------
 export const otpVerifyLimiter = rateLimit({
   windowMs: 10 * 60 * 1000, // 10 minutes
-  max: 5, // Max 5 verification attempts per window
+  max: 10, // Max 5 verification attempts per window
   standardHeaders: true,
   legacyHeaders: false,
   message: {
