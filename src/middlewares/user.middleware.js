@@ -16,7 +16,13 @@ export const authenticateToken = (req, res, next) => {
         .status(401)
         .json({ message: "Access token expired", code: "TOKEN_EXPIRED" });
     }
-    req.user = user;
+
+    const id = user.id || user.userId;
+    if (!id || !user.role) {
+      return res.status(401).json({ message: "Invalid access token" });
+    }
+
+    req.user = { ...user, id };
     next();
   });
 };

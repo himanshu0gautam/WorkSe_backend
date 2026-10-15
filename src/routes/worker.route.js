@@ -1,6 +1,7 @@
 import { Router } from "express"
 import * as workerController from "../controllers/worker.controller.js"
 import { uploadSingleImage } from "../middlewares/multer.middleware.js"
+import { authenticateToken } from "../middlewares/user.middleware.js"
 
 const workerRouter = Router()
 
@@ -14,8 +15,14 @@ workerRouter.post("/login", workerController.WorkerLogin)
 // POST - /api/v1/worker/verfiy-otp
 workerRouter.post("/verfiy-otp", workerController.verifyOTPWorker)
 
+// GET - /api/v1/worker/getAllWorkers
+workerRouter.post("/getAllWorkers", workerController.getAllWorkers)
+
+// GET - /api/v1/worker/getAllWorkers
+workerRouter.post("/:id", workerController.getWorkerById)
+
 // GET - /api/v1/worker/get-me
-workerRouter.get("/get-me", workerController.getMe)
+workerRouter.get("/get-me",authenticateToken, workerController.getMe)
 
 // POST - /api/v1/worker/refresh-token
 workerRouter.post("/refresh-token", workerController.refreshToken)
@@ -24,7 +31,7 @@ workerRouter.post("/refresh-token", workerController.refreshToken)
 workerRouter.post("/logout", workerController.workerlogout)
 
 // POST - /api/v1/worker/logout-all
-workerRouter.post("/logout-all", workerController.logoutAll)
+workerRouter.post("/logout-all",authenticateToken, workerController.logoutAll)
 
 
 export default workerRouter

@@ -14,7 +14,7 @@ const generate6DigitOTP = () => crypto.randomInt(1000, 9999).toString();
 // helper function for AT,RT
 const generateToken = (user) => {
   const accessToken = jwt.sign(
-    { userId: user._id, phone: user.phone, role: user.role },
+    { userId: user._id, phone: user.phone, role: 'user' },
     config.JWT_SECRET,
     { expiresIn: "15m" },
   );

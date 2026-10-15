@@ -5,6 +5,7 @@ import morgan from "morgan";
 import workerRouter from "./routes/worker.route.js";
 import userRouter from "./routes/user.router.js";
 import jobRouter from "./routes/job.router.js";
+import adminRouter from "./routes/admin.route.js";
 
 const app = express()
 
@@ -36,6 +37,7 @@ app.get("/health", (req, res) => {
 
 app.use("/api/v1/worker", workerRouter)
 app.use("/api/v1/user", userRouter)
-app.use("/api/v1/user/job", jobRouter)
+app.use("/api/v1/job", jobRouter)
+app.use("/api/v1/admin", adminRouter)
 
 export default app;

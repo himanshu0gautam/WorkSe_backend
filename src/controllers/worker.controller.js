@@ -14,7 +14,7 @@ const generate4DigitOTP = () => crypto.randomInt(1000, 9999).toString();
 
 const generateToken = (worker) => {
   const accessToken = jwt.sign(
-    { id: worker._id, phone: worker.phone },
+    { id: worker._id, phone: worker.phone, role: 'worker' },
     config.JWT_SECRET,
     { expiresIn: "15m" },
   );
@@ -305,6 +305,112 @@ export async function verifyOTPWorker(req, res) {
   }
 }
 
+export async function getAllWorkers(req, res) {
+  try {
+    const {
+      tradeCategory,
+      search,
+      minRating,
+      minExperience,
+      state,
+      city,
+      pincode,
+      skill,
+      page = 1,
+      limit = 10
+    } = req.query;
+
+    const query = {};
+
+    // 1. Filter by Trade Category (Exact or Regex)
+    if (tradeCategory) {
+      query.tradeCategory = { $regex: tradeCategory, $options: 'i' };
+    }
+
+    // 2. Search by Name, Job Title, or Bio
+    if (search) {
+      query.$or = [
+        { fullname: { $regex: search, $options: 'i' } },
+        { jobTitle: { $regex: search, $options: 'i' } },
+        { bio: { $regex: search, $options: 'i' } }
+      ];
+    }
+
+    // 3. Filter by Minimum Experience (e.g., at least 3 years)
+    if (minExperience) {
+      query.experience = { $gte: Number(minExperience) };
+    }
+
+    // 4. Filter by Minimum Rating (Agar aapke schema mein rating field hai)
+    if (minRating) {
+      query.rating = { $gte: Number(minRating) };
+    }
+
+    // 5. Filter by Location (State, City, Pincode)
+    if (state) {
+      query.state = { $regex: state, $options: 'i' };
+    }
+    if (city) {
+      query.city = { $regex: city, $options: 'i' };
+    }
+    if (pincode) {
+      query.pincode = pincode;
+    }
+
+    // 6. Filter by Skills (Array ya text match)
+    if (skill) {
+      // Agar skill array hai ya comma-separated string hai
+      query.skill = { $in: [new RegExp(skill, 'i')] };
+    }
+
+    const skip = (Number(page) - 1) * Number(limit);
+
+    // Fetch workers from DB
+    const workers = await workerModel.find(query)
+      .select('-__v') // Password ya sensitive data hide karne ke liye agar zaroori ho
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(Number(limit));
+
+    const totalWorkers = await workerModel.countDocuments(query);
+
+    return res.status(200).json({
+      success: true,
+      count: workers.length,
+      total: totalWorkers,
+      totalPages: Math.ceil(totalWorkers / Number(limit)),
+      currentPage: Number(page),
+      workers,
+    });
+
+  } catch (error) {
+    console.error("getAllWorkers Error:", error);
+    return res.status(500).json({
+      success: false,
+      message: error.message || "Failed to fetch workers",
+    });
+  }
+}
+
+// Get Single Worker by ID
+export async function getWorkerById(req, res) {
+  try {
+    const { id } = req.params;
+    const worker = await workerModel.findById(id);
+
+    if (!worker) {
+      return res.status(404).json({ success: false, message: "Worker not found" });
+    }
+
+    return res.status(200).json({
+      success: true,
+      worker,
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+}
+
 export async function getMe(req, res) {
   const token = req.headers.authorization?.split(" ")[1];
 
@@ -352,6 +458,7 @@ export async function refreshToken(req, res) {
   const accessToken = jwt.sign(
     {
       id: decoded.id,
+      role: "worker",
     },
     config.JWT_SECRET,
     {

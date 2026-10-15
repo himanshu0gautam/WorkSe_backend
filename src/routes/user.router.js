@@ -25,9 +25,9 @@ userRouter.get("/profile", authenticateToken, (req, res) => {
 })
 
 
-userRouter.get('/admin/dashboard', authenticateToken, authorizeRoles('admin'), (req, res) => {
-  res.json({ success: true, message: 'Welcome to Admin Dashboard' });
-});
+// userRouter.get('/admin/dashboard', authenticateToken, authorizeRoles('admin'), (req, res) => {
+//   res.json({ success: true, message: 'Welcome to Admin Dashboard' });
+// });
 
 
 export default userRouter
