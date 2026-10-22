@@ -99,7 +99,7 @@ export async function createWorker(req, res) {
     serviceRadius,
     skill,
     bio,
-    imageUrl: uploadResult.url,
+    imageUrl: uploadResult.url || [],
   });
 
   const refreshToken = jwt.sign(

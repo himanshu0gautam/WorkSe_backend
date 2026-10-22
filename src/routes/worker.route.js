@@ -16,10 +16,10 @@ workerRouter.post("/login", workerController.WorkerLogin)
 workerRouter.post("/verfiy-otp", workerController.verifyOTPWorker)
 
 // GET - /api/v1/worker/getAllWorkers
-workerRouter.post("/getAllWorkers", workerController.getAllWorkers)
+workerRouter.get("/getAllWorkers", workerController.getAllWorkers)
 
 // GET - /api/v1/worker/getAllWorkers
-workerRouter.post("/:id", workerController.getWorkerById)
+workerRouter.get("/:id", workerController.getWorkerById)
 
 // GET - /api/v1/worker/get-me
 workerRouter.get("/get-me",authenticateToken, workerController.getMe)

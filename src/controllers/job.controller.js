@@ -114,10 +114,16 @@ export async function getJob(req, res) {
 
     const skip = (Number(page) - 1) * Number(limit);
 
-    const jobs = await Job.find(query)
+    const rawJobs = await Job.find(query)
       .sort({ createdAt: -1 })
       .skip(skip)
-      .limit(Number(limit));
+      .limit(Number(limit))
+      .lean()
+
+      const jobs = rawJobs.map(job => ({
+        ...job,
+        postedTime: getTimeAgo(job.createdAt)
+      }))
 
     const totalJobs = await Job.countDocuments(query);
 
@@ -154,4 +160,27 @@ export async function getJobById(req, res) {
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
   }
+}
+
+
+// posted time helper function
+function getTimeAgo(date) {
+  const seconds = Math.floor((new Date() - new Date(date)) / 1000);
+  
+  let interval = seconds / 31536000;
+  if (interval > 1) return Math.floor(interval) + " years ago";
+  
+  interval = seconds / 2592000;
+  if (interval > 1) return Math.floor(interval) + " months ago";
+  
+  interval = seconds / 86400;
+  if (interval > 1) return Math.floor(interval) + " days ago";
+  
+  interval = seconds / 3600;
+  if (interval > 1) return Math.floor(interval) + " hours ago";
+  
+  interval = seconds / 60;
+  if (interval > 1) return Math.floor(interval) + " minutes ago";
+  
+  return "Just now";
 }

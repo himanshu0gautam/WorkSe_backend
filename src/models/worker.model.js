@@ -16,7 +16,7 @@ const workerSchema = new mongoose.Schema(
       unique: [true, "phone number must be unique"],
     },
     experience: {
-      type: Number,
+      type: String,
       index: true,
     },
     age: {

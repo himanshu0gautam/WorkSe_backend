@@ -61,6 +61,7 @@ export async function sendOTP(req, res) {
 export async function verifyOTP(req, res) {
   try {
     const { phone, otp, username } = req.body;
+    console.log(req.body); 
 
     if (!phone || !otp) {
       return res.json(new ApiResponse(400, "Phone and OTP are required"));
@@ -87,10 +88,10 @@ export async function verifyOTP(req, res) {
         user = await User.create({
             phone,
             role: "user",
-            username
+            username: username || "User"
         })
     }
-
+    
     // jwt AT, RT
     const { accessToken, refreshToken } = generateToken(user)
 
