@@ -1,6 +1,5 @@
 import mongoose, { Schema } from "mongoose";
 
-
 const workerSchema = new mongoose.Schema(
   {
     fullname: {
@@ -63,15 +62,32 @@ const workerSchema = new mongoose.Schema(
     },
     imageUrl: {
       type: String,
-      default: ''
+      default: "",
     },
     isVerfify: {
       type: Boolean,
-      default: false
-    }
+      default: false,
+    },
+    location: {
+      type: {
+        type: String,
+        enum: ["Point"],
+        default: "Point",
+      },
+      coordinates: {
+        type: [Number], // [longitude, latitude]
+        default: [0, 0],
+      },
+    },
+    ExactAddress: {
+      type: String
+    },
+    role: { type: String, default: "worker" }
   },
   { timestamps: true },
 );
+
+workerSchema.index({ location: "2dsphere" })
 
 const workerModel = mongoose.model("worker", workerSchema);
 

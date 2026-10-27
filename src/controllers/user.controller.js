@@ -14,7 +14,7 @@ const generate6DigitOTP = () => crypto.randomInt(1000, 9999).toString();
 // helper function for AT,RT
 const generateToken = (user) => {
   const accessToken = jwt.sign(
-    { userId: user._id, phone: user.phone, role: 'user' },
+    { userId: user._id, phone: user.phone, role: "user" },
     config.JWT_SECRET,
     { expiresIn: "15m" },
   );
@@ -37,7 +37,7 @@ export async function sendOTP(req, res) {
 
     const rawOtp = generate6DigitOTP();
     console.log(rawOtp);
-    
+
     const otpHash = await argon2.hash(rawOtp);
 
     // delete existing otp
@@ -61,7 +61,7 @@ export async function sendOTP(req, res) {
 export async function verifyOTP(req, res) {
   try {
     const { phone, otp, username } = req.body;
-    console.log(req.body); 
+    console.log(req.body);
 
     if (!phone || !otp) {
       return res.json(new ApiResponse(400, "Phone and OTP are required"));
@@ -82,102 +82,166 @@ export async function verifyOTP(req, res) {
     // Immediately destroy the OTP to enforce single-use protection
     await OTP.deleteOne({ _id: otpRecord._id });
 
-    //find or register 
-    let user = await User.findOne({phone})
-    if(!user){
-        user = await User.create({
-            phone,
-            role: "user",
-            username: username || "User"
-        })
+    //find or register
+    let user = await User.findOne({ phone });
+    if (!user) {
+      user = await User.create({
+        phone,
+        role: "user",
+        username: username || "User",
+        location: {
+          type: "Point",
+          coordinates: [0, 0]
+        }
+      });
     }
-    
+
     // jwt AT, RT
-    const { accessToken, refreshToken } = generateToken(user)
+    const { accessToken, refreshToken } = generateToken(user);
 
     // store RT in db
-    const refreshTokenHash = await argon2.hash(refreshToken)
+    const refreshTokenHash = await argon2.hash(refreshToken);
     await RefreshToken.create({
-        userId: user._id,
-        tokenHash: refreshTokenHash
-    })
+      userId: user._id,
+      tokenHash: refreshTokenHash,
+    });
 
-    res.cookie('refreshToken', refreshToken, {
-        httpOnly: true,
-        secure: true,
-        sameSite: 'strict',
-        maxAge: 30 * 24 * 60 * 60 * 1000, 
-    })
+    res.cookie("refreshToken", refreshToken, {
+      httpOnly: true,
+      secure: true,
+      sameSite: "strict",
+      maxAge: 30 * 24 * 60 * 60 * 1000,
+    });
 
     const userDetails = {
-        id: user._id,
-        phone: user.phone,
-        role: user.role,
-        accessToken
-    }
+      id: user._id,
+      phone: user.phone,
+      role: user.role,
+      accessToken,
+    };
 
-    return res.json(new ApiResponse(200, userDetails, "Login successful"))
-
+    return res.json(new ApiResponse(200, userDetails, "Login successful"));
   } catch (error) {
-    console.error("verifyOTP error:", error)
-    return res.json(new ApiResponse(500, "OTP verfiy error"))
+    console.error("verifyOTP error:", error);
+    return res.json(new ApiResponse(500, "OTP verfiy error"));
   }
 }
 
 export async function refreshAccessToken(req, res) {
-    try {
-        const refreshToken = req.cookies.refreshToken
+  try {
+    const refreshToken = req.cookies.refreshToken;
 
-        if(!refreshToken){
-            return res.json(new ApiResponse(401, 'Refresh token missing. Please log in again.'))
-        }
-
-        const decoded = jwt.verify(refreshToken, config.JWT_SECRET)
-
-        const userTokens = await RefreshToken.find({ userId: decoded.userId })
-        let matchedTokenRecord = null
-        for(const record of userTokens){
-            const match = await argon2.verify(record.tokenHash, refreshToken)
-            if(match){
-                matchedTokenRecord = record
-                break;
-            }
-        }
-        if(!matchedTokenRecord){
-            return res.json(new ApiResponse(403,'Invalid or revoked refresh token'))
-        }
-
-        const user = await User.findById(decoded.userId)
-        if(!user){
-            return res.json(new ApiResponse(404, "User not found"))
-        }
-
-        const accessToken = jwt.sign(
-            { userId: user._id, phone: user.phone, role: user.role },
-            config.JWT_SECRET,
-            { expiresIn: '15m' }
-        )
-
-        return res.json(new ApiResponse(200, accessToken, "New accessToken generated"))
-    } catch (error) {
-        console.error('refreshAccessToken Error:', error)
-        res.json(new ApiResponse(403, "Expired or invalid refresh token"))
+    if (!refreshToken) {
+      return res.json(
+        new ApiResponse(401, "Refresh token missing. Please log in again."),
+      );
     }
+
+    const decoded = jwt.verify(refreshToken, config.JWT_SECRET);
+
+    const userTokens = await RefreshToken.find({ userId: decoded.userId });
+    let matchedTokenRecord = null;
+    for (const record of userTokens) {
+      const match = await argon2.verify(record.tokenHash, refreshToken);
+      if (match) {
+        matchedTokenRecord = record;
+        break;
+      }
+    }
+    if (!matchedTokenRecord) {
+      return res.json(new ApiResponse(403, "Invalid or revoked refresh token"));
+    }
+
+    const user = await User.findById(decoded.userId);
+    if (!user) {
+      return res.json(new ApiResponse(404, "User not found"));
+    }
+
+    const accessToken = jwt.sign(
+      { userId: user._id, phone: user.phone, role: user.role },
+      config.JWT_SECRET,
+      { expiresIn: "15m" },
+    );
+
+    return res.json(
+      new ApiResponse(200, accessToken, "New accessToken generated"),
+    );
+  } catch (error) {
+    console.error("refreshAccessToken Error:", error);
+    res.json(new ApiResponse(403, "Expired or invalid refresh token"));
+  }
 }
 
 export async function logout(req, res) {
-    try {
-        const refreshToken = req.cookies.refreshToken
-        if(refreshToken){
-            const decoded = jwt.decode(refreshToken)
-            if(decoded?.userId){
-                await RefreshToken.deleteMany({ userId: decoded.userId })
-            }
-        }
-
-        res.clearCookie('refreshToken')
-        return res.json(new ApiResponse(200, 'Logged out successfully'))
-    } catch (error) {
-        res.json(new ApiError(500, "logout failed"))
+  try {
+    const refreshToken = req.cookies.refreshToken;
+    if (refreshToken) {
+      const decoded = jwt.decode(refreshToken);
+      if (decoded?.userId) {
+        await RefreshToken.deleteMany({ userId: decoded.userId });
+      }
     }
+
+    res.clearCookie("refreshToken");
+    return res.json(new ApiResponse(200, "Logged out successfully"));
+  } catch (error) {
+    res.json(new ApiError(500, "logout failed"));
+  }
+}
+
+export async function userLocation(req, res) {
+  try {
+    const { latitude, longitude, address } = req.body;
+
+    if (
+      !Number.isFinite(latitude) ||
+      !Number.isFinite(longitude) ||
+      latitude < -90 ||
+      latitude > 90 ||
+      longitude < -180 ||
+      longitude > 180
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Valid latitude and longitude are required.",
+      });
+    }
+
+    const userId = req.user?.id || req.user?.userId;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "UserId missing. Please log in again.",
+      });
+    }
+
+    const updateUser = await User.findByIdAndUpdate(
+      userId,
+      {
+        location: {
+          type: "Point",
+          coordinates: [parseFloat(longitude), parseFloat(latitude)],
+        },
+        address: address,
+      },
+      { new: true },
+    );
+
+    if (!updateUser) {
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found in database." });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Location updated successfully",
+      location: updateUser.location,
+      address: updateUser.address,
+    });
+  } catch (error) {
+    console.error("Error updating location in backend:", error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
 }

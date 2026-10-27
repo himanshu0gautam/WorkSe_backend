@@ -3,8 +3,12 @@ import config from "../config/config.js";
 
 export const authenticateToken = (req, res, next) => {
   const userHeader = req.headers["authorization"];
-  const token = userHeader && userHeader.split(" ")[1];
+  let token = userHeader && userHeader.split(" ")[1];
 
+  if(!token && req.cookies && req.cookies.accessToken){
+    token = req.cookies.accessToken
+  }
+  
   if (!token) {
     return res.status(401).json({ message: "Access token required" });
   }

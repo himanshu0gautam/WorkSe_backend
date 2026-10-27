@@ -9,12 +9,13 @@ import config from "../config/config.js";
 import { uploadToImagekit } from "../services/cloudStorage.js";
 import OTP from "../models/otp.model.js";
 import { sendSMS } from "../services/smsProvider.js";
+import mongoose from "mongoose";
 
 const generate4DigitOTP = () => crypto.randomInt(1000, 9999).toString();
 
 const generateToken = (worker) => {
   const accessToken = jwt.sign(
-    { id: worker._id, phone: worker.phone, role: 'worker' },
+    { id: worker._id, phone: worker.phone, role: "worker" },
     config.JWT_SECRET,
     { expiresIn: "15m" },
   );
@@ -44,6 +45,9 @@ export async function createWorker(req, res) {
     serviceRadius,
     skill,
     bio,
+    lat,
+    lng,
+    ExactAddress,
   } = req.body;
 
   if (
@@ -56,7 +60,38 @@ export async function createWorker(req, res) {
     !city ||
     !skill
   ) {
-    return res.json(new ApiResponse(400, "fullname"));
+    return res
+      .status(400)
+      .json(
+        new ApiResponse(
+          400,
+          null,
+          "Please provide all required worker registration fields.",
+        ),
+      );
+  }
+
+  const latitude = Number(lat);
+  const longitude = Number(lng);
+  if (
+    lat === undefined ||
+    lat === null ||
+    String(lat).trim() === "" ||
+    lng === undefined ||
+    lng === null ||
+    String(lng).trim() === "" ||
+    !Number.isFinite(latitude) ||
+    !Number.isFinite(longitude) ||
+    latitude < -90 ||
+    latitude > 90 ||
+    longitude < -180 ||
+    longitude > 180
+  ) {
+    return res
+      .status(400)
+      .json(
+        new ApiResponse(400, null, "A valid detected location is required."),
+      );
   }
 
   if (!req.file) {
@@ -65,7 +100,8 @@ export async function createWorker(req, res) {
       .json(
         new ApiResponse(
           400,
-          "Please upload a profile image using the 'image' field",
+          null,
+          "Please upload a profile image using the 'image' field.",
         ),
       );
   }
@@ -75,14 +111,21 @@ export async function createWorker(req, res) {
   });
 
   if (isAllready) {
-    return res.json(
-      new ApiResponse(409, "this user phone number is already exist"),
-    );
+    return res
+      .status(409)
+      .json(
+        new ApiResponse(409, null, "This phone number is already registered."),
+      );
   }
 
   const uploadResult = await uploadToImagekit(req.file, "profile-picture");
 
-  const user = await workerModel.create({
+  const workerLocation = {
+    type: "Point",
+    coordinates: [longitude, latitude],
+  };
+
+  const worker = await workerModel.create({
     fullname,
     phone,
     whattappNo,
@@ -99,12 +142,16 @@ export async function createWorker(req, res) {
     serviceRadius,
     skill,
     bio,
+    location: workerLocation,
+    role: "worker",
+    ExactAddress,
     imageUrl: uploadResult.url || [],
+    isVerfify: false,
   });
 
   const refreshToken = jwt.sign(
     {
-      id: user._id,
+      id: worker._id,
     },
     config.JWT_SECRET,
     {
@@ -118,7 +165,7 @@ export async function createWorker(req, res) {
     .digest("hex");
 
   const session = await sessionModel.create({
-    user: user._id,
+    user: worker._id,
     refreshTokenHash,
     ip: req.ip,
     userAgent: req.headers["user-agent"],
@@ -126,7 +173,7 @@ export async function createWorker(req, res) {
 
   const accessToken = jwt.sign(
     {
-      id: user._id,
+      id: worker._id,
       sessionId: session._id,
     },
     config.JWT_SECRET,
@@ -142,13 +189,18 @@ export async function createWorker(req, res) {
     maxAge: 15 * 24 * 60 * 60 * 1000,
   });
 
-  const userData = {
-    user: user.fullname,
-    phoneNo: user.phone,
+  const workerData = {
+    id: worker._id,
+    user: worker.fullname,
+    phoneNo: worker.phone,
+    ExactAddress: worker.ExactAddress,
+    role: "worker",
     token: accessToken,
   };
 
-  res.json(new ApiResponse(201, userData, "user register successfully"));
+  res
+    .status(201)
+    .json(new ApiResponse(201, workerData, "user register successfully"));
 }
 
 export async function WorkerLogin(req, res) {
@@ -297,11 +349,12 @@ export async function verifyOTPWorker(req, res) {
       accessToken,
     };
 
-        return res.json(new ApiResponse(200, workerDetails, "Worker Login successful"))
-
+    return res.json(
+      new ApiResponse(200, workerDetails, "Worker Login successful"),
+    );
   } catch (error) {
-        console.error("verifyOTP error:", error)
-        return res.json(new ApiResponse(500, "OTP verfiy error"))
+    console.error("verifyOTP error:", error);
+    return res.json(new ApiResponse(500, "OTP verfiy error"));
   }
 }
 
@@ -317,22 +370,22 @@ export async function getAllWorkers(req, res) {
       pincode,
       skill,
       page = 1,
-      limit = 10
+      limit = 10,
     } = req.query;
 
     const query = {};
 
     // 1. Filter by Trade Category (Exact or Regex)
     if (tradeCategory) {
-      query.tradeCategory = { $regex: tradeCategory, $options: 'i' };
+      query.tradeCategory = { $regex: tradeCategory, $options: "i" };
     }
 
     // 2. Search by Name, Job Title, or Bio
     if (search) {
       query.$or = [
-        { fullname: { $regex: search, $options: 'i' } },
-        { jobTitle: { $regex: search, $options: 'i' } },
-        { bio: { $regex: search, $options: 'i' } }
+        { fullname: { $regex: search, $options: "i" } },
+        { jobTitle: { $regex: search, $options: "i" } },
+        { bio: { $regex: search, $options: "i" } },
       ];
     }
 
@@ -348,10 +401,10 @@ export async function getAllWorkers(req, res) {
 
     // 5. Filter by Location (State, City, Pincode)
     if (state) {
-      query.state = { $regex: state, $options: 'i' };
+      query.state = { $regex: state, $options: "i" };
     }
     if (city) {
-      query.city = { $regex: city, $options: 'i' };
+      query.city = { $regex: city, $options: "i" };
     }
     if (pincode) {
       query.pincode = pincode;
@@ -360,14 +413,15 @@ export async function getAllWorkers(req, res) {
     // 6. Filter by Skills (Array ya text match)
     if (skill) {
       // Agar skill array hai ya comma-separated string hai
-      query.skill = { $in: [new RegExp(skill, 'i')] };
+      query.skill = { $in: [new RegExp(skill, "i")] };
     }
 
     const skip = (Number(page) - 1) * Number(limit);
 
     // Fetch workers from DB
-    const workers = await workerModel.find(query)
-      .select('-__v') // Password ya sensitive data hide karne ke liye agar zaroori ho
+    const workers = await workerModel
+      .find(query)
+      .select("-__v") // Password ya sensitive data hide karne ke liye agar zaroori ho
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(Number(limit));
@@ -382,7 +436,6 @@ export async function getAllWorkers(req, res) {
       currentPage: Number(page),
       workers,
     });
-
   } catch (error) {
     console.error("getAllWorkers Error:", error);
     return res.status(500).json({
@@ -399,7 +452,9 @@ export async function getWorkerById(req, res) {
     const worker = await workerModel.findById(id);
 
     if (!worker) {
-      return res.status(404).json({ success: false, message: "Worker not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "Worker not found" });
     }
 
     return res.status(200).json({
@@ -549,4 +604,96 @@ export async function logoutAll(req, res) {
   res.clearCookie("refreshToken");
 
   res.json(new ApiResponse(200, "Logged out from all devices successfully"));
+}
+
+export async function getNearbyWorker(req, res) {
+  try {
+    const { query, lat, lng } = req.query;
+    const workerId = req.worker?.id;
+    console.log(workerId);
+
+    // let searchLng, searchLat;
+    let searchLng, searchLat;
+
+    if (lat && lng && !isNaN(parseFloat(lat)) && !isNaN(parseFloat(lng))) {
+      searchLat = parseFloat(lat);
+      searchLng = parseFloat(lng);
+    } else if (workerId && mongoose.Types.ObjectId.isValid(workerId)) {
+      try {
+        const currentWorker = await workerModel.findById(workerId);
+        if (
+          currentWorker?.location?.coordinates &&
+          currentWorker.location.coordinates.length === 2
+        ) {
+          searchLng = currentWorker.location.coordinates[0]; // [longitude, latitude]
+          searchLat = currentWorker.location.coordinates[1];
+        }
+      } catch (workerLookupErr) {
+        console.warn(
+          "⚠️ Could not fetch current user location, using defaults:",
+          workerLookupErr.message,
+        );
+      }
+    }
+
+    if (
+      searchLng === undefined ||
+      searchLat === undefined ||
+      isNaN(searchLng) ||
+      isNaN(searchLat)
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Latitude and Longitude are required to find nearby workers.",
+      });
+    }
+
+    const matchCriteria = { };
+
+    if (query && query.trim() !== "") {
+      matchCriteria.$or = [
+        { fullname: { $regex: query, $options: "i" }},
+        {jobTitle: { $regex: query, $options: "i"}},
+      ];
+    }
+
+    let worker = [];
+
+    try {
+      worker = await workerModel.aggregate([
+        {
+          $geoNear: {
+            near: { type: "Point", coordinates: [searchLng, searchLat] },
+            distanceField: "distanceInMeters",
+            spherical: true,
+            query: matchCriteria,
+          },
+        },
+        { $sort: { distanceInMeters: 1 } },
+        { $limit: 20 },
+      ]);
+    } catch (geoError) {
+      console.warn(
+        "⚠️ $geoNear failed (Index missing or corrupt). Falling back to standard find:",
+        geoError.message,
+      );
+
+      // FALLBACK: If index isn't ready yet, fetch workers normally without crashing the server!
+      worker = await workerModel.find(matchCriteria).limit(20).lean();
+      worker = worker.map((w) => ({ ...w, distanceInMeters: 0 }));
+    }
+
+    return res.status(200).json({
+      success: true,
+      count: worker.length,
+      data: worker,
+    });
+  } catch (error) {
+    console.error("❌ Critical Error in getNearbyWorkers:", error);
+    return res.status(500).json({
+      success: false,
+      error: error.message,
+      stack: error.stack, // Sends stack trace to frontend network tab temporarily for easy reading
+    });
+  }
 }

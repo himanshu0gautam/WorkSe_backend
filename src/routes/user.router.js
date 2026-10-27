@@ -24,6 +24,8 @@ userRouter.get("/profile", authenticateToken, (req, res) => {
     res.json({ success: true, user: req.user })
 })
 
+// POST - /api/v1/user/update-location
+userRouter.post("/update-location", authenticateToken, userController.userLocation)
 
 // userRouter.get('/admin/dashboard', authenticateToken, authorizeRoles('admin'), (req, res) => {
 //   res.json({ success: true, message: 'Welcome to Admin Dashboard' });

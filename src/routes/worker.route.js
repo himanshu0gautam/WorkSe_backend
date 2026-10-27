@@ -18,9 +18,6 @@ workerRouter.post("/verfiy-otp", workerController.verifyOTPWorker)
 // GET - /api/v1/worker/getAllWorkers
 workerRouter.get("/getAllWorkers", workerController.getAllWorkers)
 
-// GET - /api/v1/worker/getAllWorkers
-workerRouter.get("/:id", workerController.getWorkerById)
-
 // GET - /api/v1/worker/get-me
 workerRouter.get("/get-me",authenticateToken, workerController.getMe)
 
@@ -32,6 +29,12 @@ workerRouter.post("/logout", workerController.workerlogout)
 
 // POST - /api/v1/worker/logout-all
 workerRouter.post("/logout-all",authenticateToken, workerController.logoutAll)
+
+// GET - /api/v1/worker/nearby-workers
+workerRouter.get("/nearby-workers", workerController.getNearbyWorker)
+
+// GET - /api/v1/worker/getAllWorkers
+workerRouter.get("/:id", workerController.getWorkerById)
 
 
 export default workerRouter

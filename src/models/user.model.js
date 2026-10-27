@@ -1,4 +1,4 @@
-import mongoose from 'mongoose';
+import mongoose from "mongoose";
 
 const userSchema = new mongoose.Schema(
   {
@@ -6,7 +6,7 @@ const userSchema = new mongoose.Schema(
       type: String,
       required: true,
       unique: true,
-      index: true 
+      index: true,
     },
     username: {
       type: String,
@@ -14,17 +14,33 @@ const userSchema = new mongoose.Schema(
     },
     role: {
       type: String,
-      enum: ['user', 'worker', 'admin'],
-      default: 'user'
+      enum: ["user", "worker", "admin"],
+      default: "user",
     },
     isVerified: {
       type: Boolean,
-      default: true
-    }
+      default: true,
+    },
+    address: {
+      type: String,
+    },
+    location: {
+      type: {
+        type: String,
+        enum: ["Point"],
+        default: "Point",
+      },
+      coordinates: {
+        type: [Number], // [longitude, latitude]
+        default: [0, 0],
+      },
+    },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
-const userModel = mongoose.model('User', userSchema);
+userSchema.index({ location: "2dsphere" });
 
-export default userModel
+const userModel = mongoose.model("User", userSchema);
+
+export default userModel;
